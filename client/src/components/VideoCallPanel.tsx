@@ -21,30 +21,57 @@ function VideoTile({
   label,
   muted = false,
   mirror = false,
+  playAudio = false,
 }: {
   stream: MediaStream;
   label: string;
   muted?: boolean;
   mirror?: boolean;
+  playAudio?: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
 
-    el.srcObject = stream;
-
-    const playVideo = () => {
+    const syncAndPlay = () => {
+      if (el.srcObject !== stream) {
+        el.srcObject = stream;
+      }
       void el.play().catch(() => {
-        // Some mobile browsers block autoplay until user interaction.
+        // Retry after track data arrives.
       });
+
+      const audioEl = audioRef.current;
+      if (audioEl && playAudio) {
+        if (audioEl.srcObject !== stream) {
+          audioEl.srcObject = stream;
+        }
+        void audioEl.play().catch(() => {});
+      }
     };
 
-    playVideo();
-    el.addEventListener('loadedmetadata', playVideo);
-    return () => el.removeEventListener('loadedmetadata', playVideo);
-  }, [stream]);
+    syncAndPlay();
+    stream.addEventListener('addtrack', syncAndPlay);
+
+    for (const track of stream.getTracks()) {
+      track.addEventListener('unmute', syncAndPlay);
+      track.addEventListener('mute', syncAndPlay);
+    }
+
+    el.addEventListener('loadedmetadata', syncAndPlay);
+    el.addEventListener('canplay', syncAndPlay);
+
+    return () => {
+      stream.removeEventListener('addtrack', syncAndPlay);
+      el.removeEventListener('loadedmetadata', syncAndPlay);
+      el.removeEventListener('canplay', syncAndPlay);
+    };
+  }, [stream, playAudio]);
+
+  const hasVideo = stream.getVideoTracks().some((t) => t.readyState === 'live');
 
   return (
     <div className="video-tile">
@@ -55,6 +82,10 @@ function VideoTile({
         playsInline
         muted={muted}
       />
+      {playAudio && (
+        <audio ref={audioRef} autoPlay playsInline className="video-tile__audio" />
+      )}
+      {!hasVideo && <div className="video-tile__placeholder">No video</div>}
       <span className="video-tile__label">{label}</span>
     </div>
   );
@@ -92,23 +123,39 @@ export default function VideoCallPanel({
     );
   }
 
+  const tiles: {
+    key: string;
+    stream: MediaStream;
+    label: string;
+    muted: boolean;
+    mirror: boolean;
+    playAudio?: boolean;
+  }[] = [
+    ...(localStream ? [{ key: 'local', stream: localStream, label: 'You', muted: true, mirror: true }] : []),
+    ...remotePeers.map((peer) => ({
+      key: peer.socketId,
+      stream: peer.stream,
+      label: peer.username,
+      muted: true,
+      mirror: false,
+      playAudio: true,
+    })),
+  ];
+
   return (
     <div className="video-call-panel">
-      <p className="video-call-panel__header">Live Video</p>
+      <p className="video-call-panel__header">
+        Live Video {tiles.length > 0 ? `(${tiles.length})` : ''}
+      </p>
       <div className="video-call-panel__grid">
-        {localStream && (
+        {tiles.map((tile) => (
           <VideoTile
-            stream={localStream}
-            label="You"
-            muted
-            mirror
-          />
-        )}
-        {remotePeers.map((peer) => (
-          <VideoTile
-            key={peer.socketId}
-            stream={peer.stream}
-            label={peer.username}
+            key={tile.key}
+            stream={tile.stream}
+            label={tile.label}
+            muted={tile.muted}
+            mirror={tile.mirror}
+            playAudio={tile.playAudio ?? false}
           />
         ))}
       </div>

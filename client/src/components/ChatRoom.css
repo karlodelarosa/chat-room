@@ -13,9 +13,10 @@
 }
 
 .chat-room__video {
-  flex: 0 0 min(38vw, 380px);
-  min-width: 260px;
-  max-width: 420px;
+  flex: 0 0 220px;
+  width: 220px;
+  min-width: 220px;
+  max-width: 220px;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border);
@@ -52,9 +53,9 @@
   .chat-room__video {
     flex: 0 0 auto;
     width: 100%;
-    max-width: none;
     min-width: 0;
-    max-height: 42vh;
+    max-width: none;
+    max-height: 28vh;
     border-right: none;
     border-bottom: 1px solid var(--border);
   }

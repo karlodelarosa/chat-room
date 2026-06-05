@@ -23,6 +23,7 @@ interface PeerEntry {
   pc: RTCPeerConnection;
   username: string;
   pendingCandidates: RTCIceCandidateInit[];
+  remoteStream: MediaStream;
 }
 
 async function flushPendingCandidates(entry: PeerEntry): Promise<void> {
@@ -119,25 +120,33 @@ export function useWebRTC(
       if (existing) return existing;
 
       const pc = new RTCPeerConnection(ICE_SERVERS);
+      const remoteStream = new MediaStream();
 
-      localStreamRef.current?.getTracks().forEach((track) => {
-        pc.addTrack(track, localStreamRef.current!);
-      });
+      const local = localStreamRef.current;
+      if (local) {
+        for (const track of local.getTracks()) {
+          pc.addTrack(track, local);
+        }
+      }
 
       pc.ontrack = (event) => {
-        const stream =
-          event.streams[0] ?? new MediaStream([event.track]);
+        const { track } = event;
+        track.enabled = true;
+
+        if (!remoteStream.getTracks().some((t) => t.id === track.id)) {
+          remoteStream.addTrack(track);
+        }
 
         setRemotePeers((prev) => {
           const found = prev.find((p) => p.socketId === remoteSocketId);
           if (found) {
             return prev.map((p) =>
-              p.socketId === remoteSocketId ? { ...p, stream } : p,
+              p.socketId === remoteSocketId ? { ...p, stream: remoteStream } : p,
             );
           }
           return [
             ...prev,
-            { socketId: remoteSocketId, username: remoteUsername, stream },
+            { socketId: remoteSocketId, username: remoteUsername, stream: remoteStream },
           ];
         });
       };
@@ -159,7 +168,12 @@ export function useWebRTC(
         }
       };
 
-      const entry: PeerEntry = { pc, username: remoteUsername, pendingCandidates: [] };
+      const entry: PeerEntry = {
+        pc,
+        username: remoteUsername,
+        pendingCandidates: [],
+        remoteStream,
+      };
       peersRef.current.set(remoteSocketId, entry);
       return entry;
     },
@@ -173,7 +187,10 @@ export function useWebRTC(
       const entry = createPeerConnection(remoteSocketId, remoteUsername);
       if (entry.pc.signalingState !== 'stable') return;
 
-      const offer = await entry.pc.createOffer();
+      const offer = await entry.pc.createOffer({
+        offerToReceiveAudio: true,
+        offerToReceiveVideo: true,
+      });
       await entry.pc.setLocalDescription(offer);
 
       socket.emit('webrtc-offer', { roomId, to: remoteSocketId, offer });
