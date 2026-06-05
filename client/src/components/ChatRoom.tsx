@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { useWebRTC } from '../hooks/useWebRTC';
 import type { ChatItem, ChatMessage, JoinRoomResult, SystemEvent } from '../types';
+import { getSavedUsername, saveUsername } from '../utils/roomSession';
 import MessageInput from './MessageInput';
 import MessageList from './MessageList';
 import RoomHeader from './RoomHeader';
@@ -26,7 +27,7 @@ function systemEvent(
 export default function ChatRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { socket, connected, connectionError } = useSocket(roomId);
+  const { socket, connected, reconnecting, connectionError } = useSocket(roomId);
 
   const [joined, setJoined] = useState(false);
   const [username, setUsername] = useState('');
@@ -34,6 +35,7 @@ export default function ChatRoom() {
   const [systemEvents, setSystemEvents] = useState<SystemEvent[]>([]);
   const [userCount, setUserCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const usernameRef = useRef('');
 
   const video = useWebRTC(socket, roomId, username, joined);
 
@@ -50,22 +52,54 @@ export default function ChatRoom() {
     return items;
   }, [messages, systemEvents]);
 
-  const onJoinComplete = useCallback((name: string, result?: JoinRoomResult) => {
-    if (result?.ok) {
-      setUsername(name);
+  useEffect(() => {
+    usernameRef.current = username;
+  }, [username]);
+
+  // Restore session after refresh.
+  useEffect(() => {
+    if (!roomId) return;
+    const saved = getSavedUsername(roomId);
+    if (saved) {
+      setUsername(saved);
       setJoined(true);
     }
-  }, []);
+  }, [roomId]);
 
-  const handleJoin = useCallback(
+  const rejoinRoom = useCallback(
     (name: string) => {
       if (!socket || !roomId) return;
       socket.emit('join-room', { roomId, username: name }, (result: unknown) => {
-        onJoinComplete(name, result as JoinRoomResult | undefined);
+        const joinResult = result as JoinRoomResult | undefined;
+        if (!joinResult?.ok) {
+          setSystemEvents((prev) => [
+            ...prev,
+            systemEvent('expired', {
+              message: joinResult?.error ?? 'Could not rejoin the room.',
+            }),
+          ]);
+          setJoined(false);
+        }
       });
     },
-    [socket, roomId, onJoinComplete],
+    [socket, roomId],
   );
+
+  const handleJoin = useCallback(
+    (name: string) => {
+      if (!roomId) return;
+      setUsername(name);
+      saveUsername(roomId, name);
+      setJoined(true);
+    },
+    [roomId],
+  );
+
+  // Join or rejoin whenever connected with an active session.
+  useEffect(() => {
+    if (!socket || !connected || !roomId || !username || !joined) return;
+    rejoinRoom(username);
+  }, [socket, connected, roomId, username, joined, rejoinRoom]);
 
   // Attach listeners as soon as the socket is ready so room-state is not missed after join.
   useEffect(() => {
@@ -99,7 +133,7 @@ export default function ChatRoom() {
     }
 
     function onUserTyping({ username: name }: { username: string }) {
-      if (name === username) return;
+      if (name === usernameRef.current) return;
       setTypingUsers((prev) => (prev.includes(name) ? prev : [...prev, name]));
     }
 
@@ -134,15 +168,15 @@ export default function ChatRoom() {
       socket.off('user-stop-typing', onUserStopTyping);
       socket.off('room-expired', onRoomExpired);
     };
-  }, [socket, roomId, username]);
+  }, [socket, roomId]);
 
   function handleSend(content: string) {
-    if (!socket || !roomId) return;
+    if (!socket || !roomId || !connected) return;
     socket.emit('send-message', { roomId, type: 'text', content });
   }
 
   function handleSendImage(imageData: string, caption?: string) {
-    if (!socket || !roomId) return;
+    if (!socket || !roomId || !connected) return;
     socket.emit('send-message', {
       roomId,
       type: 'image',
@@ -152,12 +186,12 @@ export default function ChatRoom() {
   }
 
   function handleTyping() {
-    if (!socket || !roomId || !username) return;
+    if (!socket || !roomId || !username || !connected) return;
     socket.emit('typing', { roomId, username });
   }
 
   function handleStopTyping() {
-    if (!socket || !roomId || !username) return;
+    if (!socket || !roomId || !username || !connected) return;
     socket.emit('stop-typing', { roomId, username });
   }
 
@@ -166,9 +200,16 @@ export default function ChatRoom() {
     return null;
   }
 
+  const canChat = connected && !reconnecting;
+
   return (
     <div className="chat-room">
-      <RoomHeader roomId={roomId} userCount={userCount} connected={connected} />
+      <RoomHeader
+        roomId={roomId}
+        userCount={userCount}
+        connected={connected}
+        reconnecting={reconnecting}
+      />
 
       <div className="chat-room__main">
         {joined && (
@@ -198,7 +239,7 @@ export default function ChatRoom() {
             <>
               <TypingIndicator users={typingUsers} />
               <MessageInput
-                disabled={!connected}
+                disabled={!canChat}
                 onSend={handleSend}
                 onSendImage={handleSendImage}
                 onTyping={handleTyping}

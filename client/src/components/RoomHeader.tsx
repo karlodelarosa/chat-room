@@ -5,9 +5,10 @@ interface RoomHeaderProps {
   roomId: string;
   userCount: number;
   connected: boolean;
+  reconnecting?: boolean;
 }
 
-export default function RoomHeader({ roomId, userCount, connected }: RoomHeaderProps) {
+export default function RoomHeader({ roomId, userCount, connected, reconnecting }: RoomHeaderProps) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopyLink() {
@@ -33,8 +34,8 @@ export default function RoomHeader({ roomId, userCount, connected }: RoomHeaderP
     <header className="room-header">
       <div className="room-header__info">
         <h1 className="room-header__title">#{roomId}</h1>
-        <span className={`room-header__status ${connected ? 'connected' : 'disconnected'}`}>
-          {connected ? '● Online' : '○ Reconnecting…'}
+        <span className={`room-header__status ${connected && !reconnecting ? 'connected' : 'disconnected'}`}>
+          {connected && !reconnecting ? '● Online' : reconnecting ? '○ Reconnecting…' : '○ Reconnecting…'}
         </span>
       </div>
 

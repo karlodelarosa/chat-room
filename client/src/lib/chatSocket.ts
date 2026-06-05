@@ -1,5 +1,7 @@
 type EventHandler = (data: unknown) => void;
 
+const MAX_RECONNECT_DELAY_MS = 30_000;
+
 function wsBaseUrl(): string {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   return `${wsProtocol}//${window.location.host}`;
@@ -11,22 +13,36 @@ export class ChatSocket {
   private ackCounter = 0;
   private pendingAcks = new Map<number, (data: unknown) => void>();
   private readonly url: string;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private intentionalClose = false;
+  private reconnecting = false;
 
-  constructor(roomId: string) {
-    this.url = `${wsBaseUrl()}/api/ws?roomId=${encodeURIComponent(roomId)}`;
+  constructor(roomId: string, sessionId: string) {
+    const params = new URLSearchParams({ roomId, sessionId });
+    this.url = `${wsBaseUrl()}/api/ws?${params.toString()}`;
   }
 
   connect(): void {
-    if (this.ws) return;
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
+      return;
+    }
 
+    this.intentionalClose = false;
     this.ws = new WebSocket(this.url);
 
     this.ws.addEventListener('open', () => {
+      this.reconnectAttempts = 0;
+      this.reconnecting = false;
       this.trigger('connect', undefined);
     });
 
     this.ws.addEventListener('close', () => {
+      this.ws = null;
       this.trigger('disconnect', undefined);
+      if (!this.intentionalClose) {
+        this.scheduleReconnect();
+      }
     });
 
     this.ws.addEventListener('error', () => {
@@ -82,12 +98,37 @@ export class ChatSocket {
   }
 
   disconnect(): void {
+    this.intentionalClose = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnecting = false;
     this.ws?.close();
     this.ws = null;
   }
 
   isOpen(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
+  }
+
+  isReconnecting(): boolean {
+    return this.reconnecting;
+  }
+
+  private scheduleReconnect(): void {
+    if (this.intentionalClose || this.reconnectTimer) return;
+
+    this.reconnecting = true;
+    this.trigger('reconnecting', undefined);
+
+    const delay = Math.min(1000 * 2 ** this.reconnectAttempts, MAX_RECONNECT_DELAY_MS);
+    this.reconnectAttempts += 1;
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
   }
 
   private trigger(event: string, data: unknown): void {

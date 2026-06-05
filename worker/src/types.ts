@@ -9,11 +9,6 @@ export interface ChatMessage {
   timestamp: number;
 }
 
-export interface RoomUser {
-  sessionId: string;
-  username: string;
-}
-
 export interface VideoParticipant {
   socketId: string;
   username: string;
@@ -52,6 +47,7 @@ export interface SessionAttachment {
   sessionId: string;
   username?: string;
   joined: boolean;
+  inVideo?: boolean;
 }
 
 export interface ClientEmit {
@@ -61,16 +57,13 @@ export interface ClientEmit {
   id?: number;
 }
 
-export interface ServerEvent {
-  op: 'event';
-  event: string;
-  data: unknown;
+interface MessageRow {
+  id: string;
+  username: string;
+  type: MessageType;
+  content: string;
+  image_data: string | null;
+  timestamp: number;
 }
 
-export interface ServerAck {
-  op: 'ack';
-  id: number;
-  data: unknown;
-}
-
-export type ServerMessage = ServerEvent | ServerAck;
+export { type MessageRow };
