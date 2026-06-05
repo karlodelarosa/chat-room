@@ -32,7 +32,18 @@ function VideoTile({
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
+
     el.srcObject = stream;
+
+    const playVideo = () => {
+      void el.play().catch(() => {
+        // Some mobile browsers block autoplay until user interaction.
+      });
+    };
+
+    playVideo();
+    el.addEventListener('loadedmetadata', playVideo);
+    return () => el.removeEventListener('loadedmetadata', playVideo);
   }, [stream]);
 
   return (
