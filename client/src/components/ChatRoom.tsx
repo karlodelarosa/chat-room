@@ -26,7 +26,7 @@ function systemEvent(
 export default function ChatRoom() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const { socket, connected } = useSocket();
+  const { socket, connected, connectionError } = useSocket(roomId);
 
   const [joined, setJoined] = useState(false);
   const [username, setUsername] = useState('');
@@ -210,7 +210,14 @@ export default function ChatRoom() {
       </div>
 
       {!joined && (
-        <UsernameModal onSubmit={handleJoin} disabled={!socket || !connected} />
+        <UsernameModal
+          onSubmit={handleJoin}
+          disabled={!socket || !connected}
+          statusMessage={
+            connectionError ??
+            (!connected ? 'Connecting to chat server…' : undefined)
+          }
+        />
       )}
     </div>
   );

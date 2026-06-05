@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Socket } from 'socket.io-client';
+import type { ChatSocket } from '../lib/chatSocket';
 import type { RemotePeer, VideoJoinResult } from '../types';
 
 const ICE_SERVERS: RTCConfiguration = {
@@ -12,7 +12,7 @@ interface PeerEntry {
 }
 
 export function useWebRTC(
-  socket: Socket | null,
+  socket: ChatSocket | null,
   roomId: string | undefined,
   _username: string,
   chatJoined: boolean,

@@ -91,3 +91,10 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.username-modal__status {
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  text-align: center;
+}

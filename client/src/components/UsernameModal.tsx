@@ -5,9 +5,10 @@ import './UsernameModal.css';
 interface UsernameModalProps {
   onSubmit: (username: string) => void;
   disabled?: boolean;
+  statusMessage?: string;
 }
 
-export default function UsernameModal({ onSubmit, disabled }: UsernameModalProps) {
+export default function UsernameModal({ onSubmit, disabled, statusMessage }: UsernameModalProps) {
   const [username, setUsername] = useState(() => generateUsername());
 
   function handleSubmit(e: FormEvent) {
@@ -52,6 +53,9 @@ export default function UsernameModal({ onSubmit, disabled }: UsernameModalProps
         <button type="submit" className="username-modal__submit" disabled={disabled}>
           {disabled ? 'Connecting…' : 'Enter Room'}
         </button>
+        {statusMessage && (
+          <p className="username-modal__status">{statusMessage}</p>
+        )}
       </form>
     </div>
   );

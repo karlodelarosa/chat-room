@@ -1,27 +1,47 @@
 import { useEffect, useState } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { ChatSocket } from '../lib/chatSocket';
 
-const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : window.location.origin;
+const CONNECT_TIMEOUT_MS = 10_000;
 
-export function useSocket() {
-  const [socket, setSocket] = useState<Socket | null>(null);
+export function useSocket(roomId: string | undefined) {
+  const [socket, setSocket] = useState<ChatSocket | null>(null);
   const [connected, setConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
 
   useEffect(() => {
-    const instance = io(SOCKET_URL, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true,
+    if (!roomId) return;
+
+    setConnectionError(null);
+    setConnected(false);
+
+    const instance = new ChatSocket(roomId);
+
+    instance.on('connect', () => {
+      setConnected(true);
+      setConnectionError(null);
     });
+    instance.on('disconnect', () => setConnected(false));
+    instance.on('error', () => {
+      setConnected(false);
+      setConnectionError('Could not connect to the chat server.');
+    });
+    instance.connect();
+
+    const timeout = window.setTimeout(() => {
+      if (!instance.isOpen()) {
+        setConnectionError(
+          'Connection timed out. Make sure the server is running (npm run dev).',
+        );
+      }
+    }, CONNECT_TIMEOUT_MS);
 
     setSocket(instance);
 
-    instance.on('connect', () => setConnected(true));
-    instance.on('disconnect', () => setConnected(false));
-
     return () => {
+      window.clearTimeout(timeout);
       instance.disconnect();
     };
-  }, []);
+  }, [roomId]);
 
-  return { socket, connected };
+  return { socket, connected, connectionError };
 }

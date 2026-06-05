@@ -2,10 +2,12 @@
 
 A lightweight real-time chat app with temporary rooms. No database, no authentication — just create a room, share the link, and chat.
 
+**Live site:** [chat-room.pages.dev](https://chat-room.pages.dev)
+
 ## Tech Stack
 
-- **Frontend:** React, Vite, TypeScript, React Router, Socket.IO Client, emoji-picker-react
-- **Backend:** Node.js, Express, Socket.IO
+- **Frontend:** React, Vite, TypeScript, React Router, emoji-picker-react
+- **Backend:** Cloudflare Workers, Durable Objects, WebSockets
 
 ## Features
 
@@ -16,7 +18,7 @@ A lightweight real-time chat app with temporary rooms. No database, no authentic
 - Typing indicators
 - Emoji picker
 - Camera photo capture and sharing in chat
-- Live video & voice calls (WebRTC peer-to-peer, Socket.IO signaling)
+- Live video & voice calls (WebRTC peer-to-peer, WebSocket signaling)
 - Copy room link button
 - Random username generator
 - Rooms deleted when the last user leaves
@@ -33,12 +35,16 @@ npm run dev
 
 This starts:
 
-- **API / WebSocket server** on [http://localhost:3001](http://localhost:3001)
-- **React client** on [http://localhost:5173](http://localhost:5173)
+- **Cloudflare Worker** (API + WebSockets) on [http://localhost:8787](http://localhost:8787)
+- **React client** on [http://localhost:5173](http://localhost:5173) (proxies `/api` to the worker)
 
-Open [http://localhost:5173](http://localhost:5173), click **Create Room**, pick a username, and start chatting. Open the room URL in another tab or browser to test multi-user chat.
+Open [http://localhost:5173](http://localhost:5173), click **Create Room**, pick a username, and start chatting.
 
-Click **Start Video & Voice** to join a live call. Allow camera and microphone access. Other users in the room can join the same way and you'll see each other's video and hear each other in real time.
+For the legacy Node.js server instead:
+
+```bash
+npm run dev:node
+```
 
 ## Project Structure
 
@@ -46,30 +52,55 @@ Click **Start Video & Voice** to join a live call. Allow camera and microphone a
 chatroom/
 ├── client/          # React + Vite frontend
 │   └── src/
-│       ├── components/
-│       ├── hooks/
-│       ├── utils/
-│       └── types.ts
-├── server/          # Express + Socket.IO backend
+├── worker/          # Cloudflare Worker + Durable Object
 │   └── src/
-│       ├── index.ts # Socket.IO room logic
-│       └── types.ts
-└── package.json     # Root scripts (concurrently)
+├── server/          # Legacy Express + Socket.IO (local dev only)
+├── wrangler.jsonc   # Cloudflare deployment config
+└── package.json
 ```
 
-## How Socket.IO Rooms Work
+## Deploy to Cloudflare Pages
 
-1. Each chat room maps to a Socket.IO room channel identified by `roomId`.
-2. When a user joins, the server calls `socket.join(roomId)` so broadcasts reach only that room.
-3. Room state (users, messages) is stored in an in-memory `Map` — no persistence.
-4. When the last user disconnects, the room is removed from memory.
-5. A background job checks for rooms inactive for 24+ hours and expires them.
+Same pattern as [music-playground](https://music-playground.pages.dev): connect the GitHub repo to Cloudflare Pages. The project name `chat-room` gives you **chat-room.pages.dev**.
+
+### Dashboard settings
+
+| Setting | Value |
+|---------|-------|
+| **Production branch** | `main` |
+| **Root directory** | *(leave blank)* |
+| **Build command** | `npm install && npm run build && npx wrangler deploy` |
+| **Build output directory** | *(leave blank — wrangler deploys the Worker + assets)* |
+
+### Environment variables
+
+None required.
+
+Optional:
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `NODE_VERSION` | `20` | Use if the build fails on Node version |
+
+### Deploy from CLI
+
+```bash
+npm run deploy
+```
+
+## How Chat Rooms Work
+
+1. Each chat room maps to a Durable Object instance identified by `roomId`.
+2. Clients connect via WebSocket at `/api/ws?roomId=...`.
+3. Room state (users, messages) lives in the Durable Object — no external database.
+4. When the last user disconnects, the room is cleared from memory.
+5. A Durable Object alarm expires rooms inactive for 24+ hours.
 
 ## Production Build
 
 ```bash
 npm run build
-npm start
+npm run deploy
 ```
 
-Serve the `client/dist` static files from Express or a reverse proxy in production.
+The Worker serves the built React app from `client/dist` and handles WebSocket/API traffic on the same origin.
