@@ -1,0 +1,123 @@
+.camera-modal__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 200;
+}
+
+.camera-modal {
+  width: 100%;
+  max-width: 480px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.camera-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.camera-modal__header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.camera-modal__close {
+  padding: 0.25rem 0.5rem;
+  color: var(--text-muted);
+  font-size: 1rem;
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+
+.camera-modal__close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.camera-modal__viewport {
+  aspect-ratio: 4 / 3;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.camera-modal__video,
+.camera-modal__preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.camera-modal__error {
+  padding: 2rem 1.25rem;
+  color: var(--danger);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.camera-modal__caption {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--bg-input);
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.camera-modal__caption::placeholder {
+  color: var(--text-muted);
+}
+
+.camera-modal__actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.camera-modal__btn {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+
+.camera-modal__btn.primary {
+  background: var(--accent);
+  color: white;
+}
+
+.camera-modal__btn.primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.camera-modal__btn.secondary {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+
+.camera-modal__btn.secondary:hover {
+  background: var(--bg-hover);
+}
+
+.camera-modal__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

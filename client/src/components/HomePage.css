@@ -1,0 +1,59 @@
+.home {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background:
+    radial-gradient(ellipse at top, rgba(88, 101, 242, 0.15), transparent 60%),
+    var(--bg-primary);
+}
+
+.home__card {
+  width: 100%;
+  max-width: 440px;
+  padding: 2.5rem 2rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  text-align: center;
+}
+
+.home__logo {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.home__title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.home__subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin-bottom: 2rem;
+}
+
+.home__btn {
+  width: 100%;
+  padding: 0.875rem 1.5rem;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+  border-radius: var(--radius);
+  transition: background 0.15s;
+}
+
+.home__btn:hover {
+  background: var(--accent-hover);
+}
+
+.home__hint {
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
