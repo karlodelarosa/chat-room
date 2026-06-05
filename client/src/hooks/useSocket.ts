@@ -49,7 +49,18 @@ export function useSocket(roomId: string | undefined) {
 
     setSocket(instance);
 
+    function handleVisibilityChange(): void {
+      if (document.visibilityState === 'visible') {
+        instance.pulse();
+        if (!instance.isOpen() && !instance.isReconnecting()) {
+          instance.connect();
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.clearTimeout(timeout);
       instance.disconnect();
       socketRef.current = null;

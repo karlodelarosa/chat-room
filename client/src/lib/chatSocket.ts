@@ -1,6 +1,7 @@
 type EventHandler = (data: unknown) => void;
 
 const MAX_RECONNECT_DELAY_MS = 30_000;
+const HEARTBEAT_INTERVAL_MS = 25_000;
 
 function wsBaseUrl(): string {
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -17,6 +18,7 @@ export class ChatSocket {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private intentionalClose = false;
   private reconnecting = false;
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor(roomId: string, sessionId: string) {
     const params = new URLSearchParams({ roomId, sessionId });
@@ -34,10 +36,12 @@ export class ChatSocket {
     this.ws.addEventListener('open', () => {
       this.reconnectAttempts = 0;
       this.reconnecting = false;
+      this.startHeartbeat();
       this.trigger('connect', undefined);
     });
 
     this.ws.addEventListener('close', () => {
+      this.stopHeartbeat();
       this.ws = null;
       this.trigger('disconnect', undefined);
       if (!this.intentionalClose) {
@@ -63,6 +67,8 @@ export class ChatSocket {
         } else if (msg.op === 'ack' && msg.id !== undefined) {
           this.pendingAcks.get(msg.id)?.(msg.data);
           this.pendingAcks.delete(msg.id);
+        } else if (msg.op === 'pong') {
+          // Heartbeat response — connection is alive.
         }
       } catch {
         // ignore malformed messages
@@ -99,6 +105,7 @@ export class ChatSocket {
 
   disconnect(): void {
     this.intentionalClose = true;
+    this.stopHeartbeat();
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -116,6 +123,11 @@ export class ChatSocket {
     return this.reconnecting;
   }
 
+  /** Send an immediate ping — e.g. when the tab becomes visible again. */
+  pulse(): void {
+    this.sendPing();
+  }
+
   private scheduleReconnect(): void {
     if (this.intentionalClose || this.reconnectTimer) return;
 
@@ -129,6 +141,25 @@ export class ChatSocket {
       this.reconnectTimer = null;
       this.connect();
     }, delay);
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.sendPing();
+    this.heartbeatTimer = setInterval(() => this.sendPing(), HEARTBEAT_INTERVAL_MS);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
+  private sendPing(): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({ op: 'ping' }));
+    }
   }
 
   private trigger(event: string, data: unknown): void {

@@ -39,6 +39,15 @@ function setAttachment(ws: WebSocket, attachment: SessionAttachment): void {
 export class ChatRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+
+    // Keep idle connections alive at the edge without waking the DO (avoids ~60s proxy timeout).
+    this.ctx.setWebSocketAutoResponse(
+      new WebSocketRequestResponsePair(
+        JSON.stringify({ op: 'ping' }),
+        JSON.stringify({ op: 'pong' }),
+      ),
+    );
+
     ctx.blockConcurrencyWhile(async () => {
       this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS messages (
@@ -291,6 +300,18 @@ export class ChatRoom extends DurableObject<Env> {
   async webSocketClose(ws: WebSocket): Promise<void> {
     const attachment = getAttachment(ws);
     if (!attachment.joined) return;
+
+    // During reconnect the client opens a new socket before the old one closes.
+    for (const other of this.ctx.getWebSockets()) {
+      if (other === ws) continue;
+      const otherAttachment = getAttachment(other);
+      if (
+        otherAttachment.sessionId === attachment.sessionId &&
+        otherAttachment.joined
+      ) {
+        return;
+      }
+    }
 
     const username = this.removeUser(attachment.sessionId);
     if (username) {
