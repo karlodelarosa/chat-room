@@ -47,6 +47,13 @@
   line-height: 1.4;
 }
 
+.video-call-bar__hint {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  max-width: 200px;
+}
+
 .video-call-panel__header {
   flex-shrink: 0;
   padding: 0.5rem 0.75rem;

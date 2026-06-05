@@ -118,6 +118,9 @@ export default function VideoCallPanel({
           >
             {joining ? 'Starting camera…' : '📹 Start Video & Voice'}
           </button>
+          <p className="video-call-bar__hint">
+            One person joins first, then the other. Both must tap this button.
+          </p>
         </div>
       </div>
     );
